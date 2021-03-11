@@ -47,11 +47,14 @@ from seekr.utils import get_adj
 
 def pearson(counts1, counts2, row_standardize=True, outfile=None):
     """Calculates a column standardized Pearson correlation matrix"""
+    print("hi")
     if row_standardize:
         counts1 = (counts1.T - np.mean(counts1, axis=1)).T
         counts1 = (counts1.T / np.std(counts1, axis=1)).T
         counts2 = (counts2.T - np.mean(counts2, axis=1)).T
         counts2 = (counts2.T / np.std(counts2, axis=1)).T
+
+    print("bye")
 
     # Take the inner product and save
     dist = np.inner(counts1, counts2) / counts1.shape[1]
@@ -111,6 +114,34 @@ def pvalue(dist, N):
     pvals = t.sf(np.abs(pvals), N - 2) * 2
     return pvals
 
+def correlation_pvalue(dist, N):
+    """Calculate the p-values (upper tailed) of a Pearson correlation matrix
+
+    Parameters
+    ----------
+    dist : ndarray
+        Pearson correlation matrix
+    N : int
+        Sample size. (The length of each array used to find the R value)
+
+    Returns
+    -------
+    pvals : ndarray
+        p-value for each R value
+
+    Reference
+    ---------
+    http://stats.stackexchange.com/questions/120199/calculate-p-value-for-the-correlation-coefficient
+    http://stackoverflow.com/questions/17559897/python-p-value-from-t-statistic
+    """
+
+    ## Prepare Data
+
+    ## Generate 
+
+    pvals = dist / np.sqrt((1 - dist ** 2) / (N - 2))
+    pvals = t.sf(np.abs(pvals), N - 2) * 2
+    return pvals
 
 class DomainPearson:
     """Calculate r-values and percentiles over windows of target sequences for a list of queries.

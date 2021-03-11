@@ -22,6 +22,7 @@ import gzip
 import pickle
 import shutil
 import ftplib
+import random
 import requests
 import urllib.request
 import numpy as np
@@ -335,12 +336,42 @@ class RandomMaker(Maker):
         """
         if self.individual:
             new_seqs = self.get_random_seqs(self.seqs)
+            print(str(new_seqs))
         else:
             new_seqs = self.get_random_seqs(["".join(self.seqs)])
             new_seqs = self.split(new_seqs[0])
         self.new_fasta_seqs = self.inject_seqs(new_seqs)
         self.save()
         return self.new_fasta_seqs
+
+    def synthesize_random_transcripts(self, n, length):
+        """Make random RNAs based on natural RNAs.
+
+        Returns
+        -------
+        new_fasta_seqs : list
+            Lines of the new fasta file
+        """
+        new_seqs = self.get_random_seqs(["".join(self.seqs)])
+        new_seqs = new_seqs[0]
+
+        def get_random_str(main_str, substr_len):
+            idx = random.randrange(0, len(main_str) - substr_len + 1)
+            return main_str[idx : (idx+substr_len)]
+
+        new_seq = []
+        for i in range(0, n):
+            new_seq.append(get_random_str(new_seqs, length))
+
+        new_fasta_seqs = []
+        for i in range(0, n):
+            new_fasta_seqs.append("seq{}".format(i))
+            new_fasta_seqs.append(new_seq[i])
+
+        self.new_fasta_seqs = new_fasta_seqs
+        self.save()
+        #return self.new_fasta_seqs
+        return new_seqs
 
 
 class Downloader:

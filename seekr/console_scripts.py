@@ -2,6 +2,7 @@ import sys
 import argparse
 import numpy as np
 import pandas as pd
+import tempfile
 
 from seekr import fasta
 from seekr import graph
@@ -129,6 +130,28 @@ Any issues can be reported to https://github.com/CalabreseLab/seekr/issues
 ---
 """
 
+PVALUE_DOC = """
+Description
+-----------
+Generate a matrix of upper tail pvalues for a pearson's correlation matrix
+
+Examples
+--------
+The default settings accepts a csv file of pearson's correlation as well as a randomized transcriptome.
+Third and fourth argument of the fasta files used to generate the pearson's correlation matrix can be given as well.
+The output of this function is a csv file of the upper tail pvalues of the pearson's correlation matrix.
+    $ seekr_pvalue pearsons.csv randomized_transcriptome.csv -o out.csv -a Xist.fasta gencode.fasta
+
+Notes
+-----
+For more sophisticated options, you cannot use the command line, but need python instead.
+
+Issues
+------
+Any issues can be reported to https://github.com/CalabreseLab/seekr/issues
+
+---
+"""
 
 VISUALIZE_DISTRO_DOC = """
 Description
@@ -461,7 +484,6 @@ def _run_pearson(counts1, counts2, outfile, binary_input, binary_output):
         dist = pd.DataFrame(dist, names1, names2)
         dist.to_csv(outfile)
 
-
 def console_pearson():
     assert sys.version_info[0] == 3, "Python version must be 3.x"
     parser = argparse.ArgumentParser(usage=PEARSON_DOC, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -479,6 +501,53 @@ def console_pearson():
     args = _parse_args_or_exit(parser)
     _run_pearson(args.counts1, args.counts2, args.outfile, args.binary_input, args.binary_output)
 
+def _run_pvalue(pearson, transcriptome, outfile, kmer, seed = None, a = None, b = None):
+#    if a is not None and b is not None:
+#        
+    kmer = int(kmer)
+    if seed is not None:
+        seed = int(seed)
+    individual = False
+    out_fasta1 = next(tempfile._get_candidate_names())
+    out_fasta1 = tempfile._get_default_tempdir() + "/" + out_fasta1
+    out_fasta2 = next(tempfile._get_candidate_names())
+    out_fasta2 = tempfile._get_default_tempdir() + "/" + out_fasta2
+
+    rand_maker1 = fasta.RandomMaker(transcriptome, out_fasta1, kmer, individual = individual)
+    rand_maker1.synthesize_random_transcripts(100, 100)
+    rand_maker2 = fasta.RandomMaker(transcriptome, out_fasta2, kmer, individual = individual)
+    rand_maker2.synthesize_random_transcripts(100, 100)
+
+    counts1 = BasicCounter(out_fasta1,
+                           outfile = None,
+                            k = kmer)
+    counts2 = BasicCounter(out_fasta2,
+                           outfile = None,
+                           k = kmer)
+
+    print(type(counts1))
+    print(type(counts1.counts))
+    print(outfile)
+
+    sim = pearson(counts1.counts, counts2.counts, outfile = outfile)
+
+    return None
+
+def console_pvalue():
+    assert sys.version_info[0] == 3, "Python version must be 3.x"
+    parser = argparse.ArgumentParser(usage=PVALUE_DOC, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("counts1", help="Full path of a count file produced by kmer_counts.py.")
+    parser.add_argument(
+        "counts2",
+        help=(
+            "Full path of a second count file produced by kmer_counts.py. "
+            "This can be the same path as the first counts file."
+        ),
+    )
+    parser.add_argument("-o", "--outfile", help="Path of file to save similarities to.")
+    parser.add_argument("-k", "--kmer", help="Path of file to save similarities to.")
+    args = _parse_args_or_exit(parser)
+    _run_pvalue(args.counts1, args.counts2, args.outfile, args.kmer)
 
 def _run_visualize_distro(adj, out_path, sample):
     if sample is not None:
@@ -588,6 +657,31 @@ def console_gen_rand_rnas():
     args = _parse_args_or_exit(parser)
     _run_gen_rand_rnas(args.in_fasta, args.out_fasta, int(args.kmer), int(args.mutations), args.seed, args.group)
 
+def _run_gen_rand_transcripts(in_fasta, out_fasta, kmer, mutations, seed, group):
+    # Note: This function is separated for testing purposes.
+    # TODO do something with group?
+    kmer = int(kmer)
+    mutations = int(mutations)
+    if seed is not None:
+        seed = int(seed)
+    individual = not group
+    rand_maker = fasta.RandomMaker(in_fasta, out_fasta, kmer, mutations, seed, individual)
+    rand_maker.synthesize_random_transcripts(10)
+
+
+def console_gen_rand_transcripts():
+    assert sys.version_info[0] == 3, "Python version must be 3.x"
+    parser = argparse.ArgumentParser(usage=GEN_RAND_RNAS_DOC, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("in_fasta", help="path to .fa file")
+    parser.add_argument("out_fasta", help="path to new .fa file")
+    parser.add_argument("-k", "--kmer", default=1, help="Length of kmers you want to conserve")
+    parser.add_argument("-m", "--mutations", default=0, help="Number of SNP mutations to make in RNA")
+    parser.add_argument("-s", "--seed", default=None, help="An integer to create reproducible results between runs.")
+    parser.add_argument(
+        "-g", "--group", action="store_true", help="Set to concatenate RNAs before shuffling and mutating."
+    )
+    args = _parse_args_or_exit(parser)
+    _run_gen_rand_transcripts(args.in_fasta, args.out_fasta, int(args.kmer), int(args.mutations), args.seed, args.group)
 
 def _run_pwms(pwm_dir, counts, kmer, out_path):
     # TODO (Dan) name this function
@@ -695,9 +789,11 @@ def _run_console_seekr_help(version):
         "seekr_norm_vectors": NORM_VECTORS_DOC,
         "seekr_kmer_counts": KMER_COUNTS_DOC,
         "seekr_pearson": PEARSON_DOC,
+        "seekr_pvalue": PVALUE_DOC,
         "seekr_visualize_distro": VISUALIZE_DISTRO_DOC,
         "seekr_graph": GRAPH_DOC,
         "seekr_gen_rand_rnas": GEN_RAND_RNAS_DOC,
+        "seekr_gen_rand_transcripts": GEN_RAND_RNAS_DOC,
         "seekr_pmw": PWM_DOC,
         "seekr_domain_pearson": DOMAIN_PEARSON_DOC,
     }
